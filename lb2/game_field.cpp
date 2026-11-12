@@ -1,5 +1,7 @@
 #include "game_field.h"
 
+#include <utility>
+
 namespace lab2 {
 
 namespace {
@@ -14,7 +16,8 @@ GameField::GameField(int width, int height) : width_(width), height_(height) {  
     if (height < kMinSize) height_ = kMinSize;
     else if (height > kMaxSize) height_ = kMaxSize;
 
-    cells_.assign(height_, std::vector<Cell>(width_)); // cells_[y][x]
+    cells_.resize(height_); // cells_[y][x]
+    for (auto& row : cells_) row.resize(width_);
 }
 
 int GameField::GetWidth() const {
@@ -46,6 +49,22 @@ void GameField::SetPassCost(int x, int y, int cost) {
     if (IsInside(x, y)) {
         cells_[y][x].SetPassCost(cost);
     }
+}
+
+void GameField::AddStatusToCell(int x, int y, std::unique_ptr<IStatus> status) {
+    if (IsInside(x, y)) cells_[y][x].AddStatus(std::move(status));
+}
+
+void GameField::ApplyCellStatusesTo(Robot& robot, int x, int y) const {
+    if (IsInside(x, y)) cells_[y][x].ApplyTo(robot);
+}
+
+void GameField::RemoveRandomStatusFromCell(int x, int y) {
+    if (IsInside(x, y)) cells_[y][x].RemoveRandomStatus();
+}
+
+std::size_t GameField::GetCellStatusCount(int x, int y) const {
+    return IsInside(x, y) ? cells_[y][x].GetStatusCount() : 0;
 }
 
 }

@@ -1,10 +1,17 @@
 #ifndef LAB1_ROBOT_H_
 #define LAB1_ROBOT_H_
 
+#include <functional>
+#include <memory>
 #include <string>
+#include <vector>
+
+#include "ability.h"
+#include "status.h"
 
 namespace lab2 {
 
+class Game;
 class Robot {
 public:
     Robot(const std::string& name, int health, int max_health, int attack,
@@ -33,7 +40,9 @@ public:
     int GetSpeed() const;
     int GetVisibilityRadius() const;
 
-    int GetX() const;
+    const std::vector<std::unique_ptr<IStatus>>& GetStatuses() const;
+
+    int GetX() const; // position
     int GetY() const;
     void SetPosition(int x, int y);
 
@@ -54,7 +63,26 @@ public:
     void TakeDamage(int damage);
     void Heal(int amount); // recover health
     void AddExperience(int amount);
-    
+
+    // statuses
+    bool IsMovementBlocked() const;
+    bool AreAbilitiesBlocked() const;
+    bool HasStatus(const std::string& name) const;   // for ItemPickup
+    void AddStatus(std::unique_ptr<IStatus> status);
+    void OnAbilityAttempted();
+    void EndTurn();
+    void ApplyDamage(int damage);
+
+    // abilities
+    bool HasAbility(AbilityKind kind) const;
+    void AddAbility(AbilityKind kind);
+    bool TryUseAbility(Game& game, AbilityKind kind, int tx, int ty);
+    void UpgradeAbility(AbilityKind kind);
+    const std::vector<std::unique_ptr<ISpecialAbility>>& GetAbilities() const;
+
+    // rank
+    void SetRankUpCallback(std::function<void(Robot&)> cb);
+
 private:
     void TryRankUp(); // if necessary experience is
 
@@ -73,6 +101,10 @@ private:
     // position
     int x_;
     int y_;
+
+    std::vector<std::unique_ptr<ISpecialAbility>> abilities_;
+    std::vector<std::unique_ptr<IStatus>> statuses_;
+    std::function<void(Robot&)> rank_up_callback_;
 };
 
 }

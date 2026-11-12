@@ -35,6 +35,13 @@ void TestCell() {
     c.SetPassCost(-5);
     assert(c.GetPassCost() == 1);   // set to 1
     std::cout << "SetPassCost(-5): clamped to 1\n";
+
+    // статусы клетки: не больше 2
+    c.AddStatus(CreateSlowStatus());
+    c.AddStatus(CreateOverloadStatus());
+    c.AddStatus(CreateShieldStatus(10));   // третий не добавится
+    assert(c.GetStatusCount() == 2);
+    std::cout << "cell statuses: max 2: ok\n";
 }
 
 // ============ GameField ============
@@ -70,8 +77,16 @@ void TestGameField() {
     GameField big(100, 100); // > kMaxSize=50
     assert(big.GetWidth() == 50);
     assert(big.GetHeight() == 50);
-    // Now: width = kMaxSize = 50
     std::cout << "max size clamp: 100 -> " << big.GetWidth() << "\n";
+
+    // статусы на клетке: наложение и случайное снятие
+    f.AddStatusToCell(1, 1, CreateSlowStatus());
+    f.AddStatusToCell(1, 1, CreateShieldStatus(10));
+    f.AddStatusToCell(1, 1, CreateOverloadStatus());  // третий не добавится
+    assert(f.GetCellStatusCount(1, 1) == 2);
+    f.RemoveRandomStatusFromCell(1, 1);
+    assert(f.GetCellStatusCount(1, 1) == 1);
+    std::cout << "cell statuses apply/remove: ok\n";
 }
 
 // ============ Robot ============
@@ -180,37 +195,31 @@ void TestGame() {
     Game game(10, 10);
     game.ConfigureDemo();
 
-    // player is alive
     assert(game.GetPlayer().IsAlive() == true);
     assert(game.GetPlayerPosition() == std::make_pair(0, 0));
     std::cout << "initial: player at (0,0)\n";
 
-    // Enemies created
     assert(game.GetEnemies().size() == 3);
     assert(game.GetFriends().size() == 1);
     std::cout << "enemies: 3, friends: 1\n";
 
-    // Factory created
     assert(game.GetFactories().size() == 1);
     std::cout << "factory: 1\n";
 
-    // Level isn't complete
     assert(game.IsLevelComplete() == false);
     std::cout << "level not complete: ok\n";
 
-    // step
     auto old_pos = game.GetPlayerPosition();
-    game.Step(Direction::kDown);  // go down (if can)
+    game.Step(Direction::kDown);
     auto new_pos = game.GetPlayerPosition();
-    std::cout << "step down (with demo): ("
+    std::cout << "step down: ("
               << old_pos.first << "," << old_pos.second << ") -> ("
               << new_pos.first << "," << new_pos.second << ")\n";
 
-    // Visibility
     auto pos = game.GetPlayerPosition();
-    assert(game.IsVisible(pos.first, pos.second) == true); // sees itself
-    assert(game.IsExplored(pos.first, pos.second) == true); // cell is explored
-    assert(game.IsVisible(50, 50) == false);   // out of field
+    assert(game.IsVisible(pos.first, pos.second) == true);
+    assert(game.IsExplored(pos.first, pos.second) == true);
+    assert(game.IsVisible(50, 50) == false);
     std::cout << "visibility: ok\n";
 }
 
@@ -225,7 +234,108 @@ void TestConsoleRenderer() {
     ConsoleRenderer renderer(game);
     renderer.Render();
 
-    std::cout << "render: ok\n";
+    // переключение режимов
+    assert(renderer.GetMode() == RenderMode::kNormal);
+    renderer.ToggleMode();
+    assert(renderer.GetMode() == RenderMode::kHighlightEnemies);
+    renderer.ToggleMode();
+    assert(renderer.GetMode() == RenderMode::kHighlightWalls);
+    renderer.ToggleMode();
+    assert(renderer.GetMode() == RenderMode::kHighlightStatusCells);
+    renderer.ToggleMode();
+    assert(renderer.GetMode() == RenderMode::kNormal);
+    std::cout << "render modes toggle: ok\n";
+}
+
+// ============ Abilities ============
+void TestAbilities() {
+    std::cout << "\n=== Abilities ===\n";
+    Game game(10, 10);
+    game.ConfigureDemo();
+    assert(game.GetPlayer().HasAbility(AbilityKind::kAreaStrike));
+    std::cout << "start ability: ok\n";
+}
+
+// ============ Statuses ============
+void TestStatuses() {
+    std::cout << "\n=== Statuses ===\n";
+
+    // Slow finishing
+    Robot r("R", 100, 100, 0, 100, 100, 0, 100, 3, 1);
+    r.AddStatus(CreateSlowStatus());
+    r.AddStatus(CreateSlowStatus());
+    assert(r.IsMovementBlocked());
+    r.EndTurn(); r.EndTurn();
+    assert(!r.IsMovementBlocked());
+    std::cout << "slow: ok\n";
+
+    // Overload — только одна
+    r.AddStatus(CreateOverloadStatus());
+    r.AddStatus(CreateOverloadStatus());
+    assert(r.AreAbilitiesBlocked());
+    r.OnAbilityAttempted();
+    assert(!r.AreAbilitiesBlocked());
+    std::cout << "overload: ok\n";
+
+    // Shield: щит равен переданному значению (OnApply пустой)
+    Robot s("S", 100, 100, 0, 100, 100, 0, 100, 3, 1);
+    s.AddStatus(CreateShieldStatus(20));
+    s.ApplyDamage(15);
+    assert(s.GetHealth() == 100);     // всё в щит
+    s.ApplyDamage(10);
+    assert(s.GetHealth() == 95);      // 5 в здоровье
+    std::cout << "shield: ok\n";
+
+    // Burning: бьёт сквозь щит
+    Robot b("B", 100, 100, 0, 100, 100, 0, 100, 3, 1);
+    b.AddStatus(CreateShieldStatus(50));
+    b.AddStatus(CreateBurningStatus(2, 5));
+    b.EndTurn();
+    assert(b.GetHealth() == 95);       // щит не защитил
+    std::cout << "burning through shield: ok\n";
+
+    // AttackBoost: временный буст
+    Robot a("A", 100, 100, 10, 100, 100, 0, 100, 3, 1);
+    a.AddStatus(CreateAttackBoostStatus(5, 2));
+    assert(a.GetAttack() == 15);
+    a.EndTurn();
+    assert(a.GetAttack() == 15);
+    a.EndTurn();
+    assert(a.GetAttack() == 10);
+    std::cout << "attack boost: ok\n";
+
+}
+
+// ============ Inventory ============
+
+void TestInventory() {
+    std::cout << "\n=== Inventory ===\n";
+    Game game(10, 10);
+    game.ConfigureDemo();
+
+    assert(game.GetInventory().empty());
+
+    game.AddItem(ItemKind::kHealthPotion);
+    game.AddItem(ItemKind::kEnergyPotion);
+    game.AddItem(ItemKind::kAttackBoost);
+    assert(game.GetInventory().size() == 3);
+
+    // энергия тратится, потом восстанавливается зельем
+    int e0 = game.GetPlayer().GetEnergy();
+    assert(game.UseItem(1));                 // энергия
+    assert(game.GetPlayer().GetEnergy() > e0);
+    assert(game.GetInventory().size() == 2);
+
+    // буст атаки
+    int atk0 = game.GetPlayer().GetAttack();
+    assert(game.UseItem(1));                 // буст (после удаления индекс сдвинулся)
+    assert(game.GetPlayer().GetAttack() == atk0 + 5);
+    assert(game.GetInventory().size() == 1);
+
+    // неверный индекс
+    assert(!game.UseItem(5));
+
+    std::cout << "inventory: ok\n";
 }
 
 // ============ main ============
@@ -237,6 +347,9 @@ int main() {
     TestRobotFactory();
     TestGame();
     TestConsoleRenderer();
+    TestAbilities();
+    TestStatuses();
+    TestInventory();
 
     std::cout << "\n=== All tests passed! ===\n";
     return 0;

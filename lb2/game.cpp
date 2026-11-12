@@ -8,36 +8,47 @@ namespace {
     constexpr int kEnergyRegen = 10;
     constexpr int kMoveEnergyCost = 1;
     constexpr int kAttackEnergyCost = 2;
+
+    // Вероятности: чем больше статусов, тем меньше вероятность
+    constexpr int kChanceTwoStatuses = 10;   // 10% — two
+    constexpr int kChanceOneStatus   = 15;   // 15% — one (at all 25%)
+    constexpr int kBurningCellTurns  = 3;
+    constexpr int kBurningCellDamage = 4;
+    constexpr int kShieldCellAmount  = 15;
+
+    // inventory
+    constexpr int kHealthPotionHeal = 30;
+    constexpr int kEnergyPotionRegen = 20;
+    constexpr int kAttackBoostBonus = 5;
+    constexpr int kAttackBoostTurns = 3;
 }
 
 Game::Game(int width, int height) : field_(width, height),
         player_(std::make_unique<Robot>("Player", 100, 100, 10,
-                                        40, 50, 0, 100, 
+                                        40, 50, 0, 100,
                                         3,  // speed
                                         2)) // visibility_radius
 {
-    player_->SetPosition(0, 0); // Устанавливаем позицию игрока
+    player_->SetPosition(0, 0); 
 
-    explored_cells_.assign(field_.GetHeight(), 
+    explored_cells_.assign(field_.GetHeight(),
                             std::vector<bool>(field_.GetWidth(), false));
     UpdateVisibility();
 }
 
-
-
-void Game::ConfigureDemo() {
+void Game::ConfigureDemo(AbilityKind start_ability) {
 
     int fx = field_.GetWidth() / 2 - 1; // place of factory
     int fy = field_.GetHeight() / 2 - 1;
-    
+
     for(int dy = 0; dy < 2; dy++) {
         for(int dx = 0; dx < 2; dx++) {
             field_.SetPassable(fx + dx, fy + dy, false);
         }
     }
-    
+
     factories_.push_back(std::make_unique<RobotFactory>(fx, fy, 5));
-    
+
     field_.SetPassable(1, 1, false); // walls
     field_.SetPassable(2, 2, false);
     field_.SetPassable(3, 1, false);
@@ -56,7 +67,10 @@ void Game::ConfigureDemo() {
     field_.SetPassCost(8, 9, 2);
 
     GenerateEnemies(3);
-    GenerateFriends(1); 
+    GenerateFriends(1);
+
+    player_->AddAbility(start_ability);
+    GenerateCellStatuses();
 }
 
 void Game::GenerateEnemies(int count) {
@@ -73,6 +87,8 @@ void Game::GenerateEnemies(int count) {
                 "Enemy" + std::to_string(placed), 40, 40, 5,
                 30, 30, 0, 100, 3, 1);
             enemy->SetPosition(x, y);
+            // Heal or Teleport for enemy
+            enemy->AddAbility((std::rand() % 2) ? AbilityKind::kHeal : AbilityKind::kTeleport);
             enemies_.push_back(std::move(enemy));
             ++placed;
         }
@@ -100,19 +116,19 @@ void Game::GenerateFriends(int count) {
 }
 
 bool Game::IsOccupiedExcept(int x, int y, const Robot* except) const {
-    if (player_.get() != except && player_->GetX() == x && player_->GetY() == y) { //occupied by player
+    if (player_.get() != except && player_->GetX() == x && player_->GetY() == y) {
         return true;
     }
 
     for (const auto& enemy : enemies_) {
         if (enemy.get() == except) continue;
         if (!enemy->IsAlive()) continue;
-        if (enemy->GetX() == x && enemy->GetY() == y) return true; //occupied by enemy
+        if (enemy->GetX() == x && enemy->GetY() == y) return true;
     }
-    
+
     for (const auto& friend_ : friends_) {
         if (friend_.get() == except) continue;
-        if (friend_->GetX() == x && friend_->GetY() == y) return true; //occupied by friend
+        if (friend_->GetX() == x && friend_->GetY() == y) return true;
     }
 
     return false;
@@ -151,16 +167,12 @@ void Game::ApplyInteraction(Robot& robot, int x, int y) {
                 return;
             }
         }
-        return; // player don't attacks friend
+        return; // player doesn't attack friend
     }
-    
-    for (const auto& enemy : enemies_) {
-        if (&robot == enemy.get()) {
-            if (player_->GetX() == x && player_->GetY() == y) {
-                robot.Interact(*player_, true);
-            }
-            return; // enemy attacks only player (not other enemies, not friend)
-        }
+
+    // enemy attacks only player
+    if (player_->GetX() == x && player_->GetY() == y) {
+        robot.Interact(*player_, true);
     }
 }
 
@@ -193,55 +205,45 @@ void Game::UpdateVisibility() {
     }
 }
 
+bool Game::TryMoveRobot(Robot& robot, int x, int y) {
+    if (!field_.IsPassable(x, y)) return false;
+    if (IsOccupiedExcept(x, y, &robot)) return false;
+    if (robot.GetEnergy() < kMoveEnergyCost) return false;
+    if (robot.IsMovementBlocked()) return false;   // slow
+
+    robot.SetEnergy(robot.GetEnergy() - kMoveEnergyCost);
+    robot.SetPosition(x, y);
+    field_.ApplyCellStatusesTo(robot, x, y);     // apply statuses (robot)
+    field_.RemoveRandomStatusFromCell(x, y);     // remove status (cell)
+    return true;
+}
+
+bool Game::TryAttack(Robot& attacker, int x, int y) {
+    if (attacker.GetEnergy() < kAttackEnergyCost) return false;
+    attacker.SetEnergy(attacker.GetEnergy() - kAttackEnergyCost);
+    ApplyInteraction(attacker, x, y);
+    return false; // end of turn
+}
 
 bool Game::TryMovePlayer(int x, int y) {
-    if (!field_.IsPassable(x, y)) return false;
-
     if (IsEnemyAt(x, y)) { // enemy
-        if(player_->GetEnergy() < kAttackEnergyCost) return false;
-        player_->SetEnergy(player_->GetEnergy() - kAttackEnergyCost);
-        ApplyInteraction(*player_, x, y);
-        return false; // end of turn
+        return TryAttack(*player_, x, y);
     }
-
-    if (IsOccupiedExcept(x, y, player_.get())) return false;
-
-    if(player_->GetEnergy() < kMoveEnergyCost) return false;
-    player_->SetEnergy(player_->GetEnergy() - kMoveEnergyCost);
-
-    player_->SetPosition(x, y);
-    return true;
+    return TryMoveRobot(*player_, x, y);
 }
 
 bool Game::TryMoveEnemy(std::size_t index, int x, int y) {
-    if (!field_.IsPassable(x, y)) return false;
-
     if (player_->GetX() == x && player_->GetY() == y) {
         if(!player_->IsAlive()) return false;
-        if (enemies_[index]->GetEnergy() < kAttackEnergyCost) return false;
-        enemies_[index]->SetEnergy(enemies_[index]->GetEnergy() - kAttackEnergyCost);
-        ApplyInteraction(*enemies_[index], x, y);
-        return false;
+        return TryAttack(*enemies_[index], x, y);
     }
-
-    if (IsOccupiedExcept(x, y, enemies_[index].get())) return false;
-
-    if (enemies_[index]->GetEnergy() < kMoveEnergyCost) return false;
-    enemies_[index]->SetEnergy(enemies_[index]->GetEnergy() - kMoveEnergyCost);
-    enemies_[index]->SetPosition(x, y);
-    return true;
+    return TryMoveRobot(*enemies_[index], x, y);
 }
 
 bool Game::TryMoveFriend(std::size_t index, int x, int y) {
-    if (!field_.IsPassable(x, y)) return false;
-
     if (player_->GetX() == x && player_->GetY() == y) return false;
-    if (IsOccupiedExcept(x, y, friends_[index].get())) return false;
 
-    if (friends_[index]->GetEnergy() < kMoveEnergyCost) return false;
-    friends_[index]->SetEnergy(friends_[index]->GetEnergy() - kMoveEnergyCost);
-    friends_[index]->SetPosition(x, y);
-    return true;
+    return TryMoveRobot(*friends_[index], x, y);
 }
 
 void Game::StepPlayer(Direction direction) {
@@ -332,7 +334,7 @@ void Game::RegenerateEnergy() {
     if(player_->IsAlive()) {
         player_->RegenerateEnergy(kEnergyRegen);
     }
-    
+
     for (auto& enemy : enemies_) {
         if(enemy->IsAlive()) enemy->RegenerateEnergy(kEnergyRegen);
     }
@@ -342,15 +344,29 @@ void Game::RegenerateEnergy() {
     }
 }
 
-void Game::Step(Direction direction) {
-    if(!player_->IsAlive() || IsLevelComplete()) return;
-    StepPlayer(direction);
+void Game::EndPlayerTurn() {
     StepEnemies();
     StepFriends();
-    if(!IsLevelComplete()) StepFactories();
+    if (!IsLevelComplete()) StepFactories();
     RegenerateEnergy();
+
+    if (player_->HasStatus("Получение предмета")) {  // ItemPickup only for player
+        AddItem(RandomItemKind());
+    }
+    // check status at the end of turn
+    player_->EndTurn();
+    for (auto& e : enemies_) if (e->IsAlive()) e->EndTurn();
+    for (auto& f : friends_) f->EndTurn();
+
     UpdateVisibility();
 }
+
+void Game::Step(Direction direction) {
+    if (!player_->IsAlive() || IsLevelComplete()) return;
+    StepPlayer(direction);
+    EndPlayerTurn();
+}
+
 
 bool Game::IsLevelComplete() const {
     for (const auto& enemy : enemies_) {
@@ -385,11 +401,105 @@ void Game::GeneratorEnemyFromFactory(RobotFactory& factory) {
 
             auto new_enemy = std::make_unique<Robot>(name, 40, 40, 5, 30, 30, 0, 100, 3, 1);
             new_enemy->SetPosition(x, y);
+            new_enemy->AddAbility((std::rand() % 2) ? AbilityKind::kHeal : AbilityKind::kTeleport);
             enemies_.push_back(std::move(new_enemy));
             return;
         }
     }
     factory.ResetCounter(); // place for generating is not found
+}
+
+// for abilities
+void Game::ForEachRobot(const std::function<void(Robot&)>& fn) const{
+    if (player_->IsAlive()) fn(*player_);
+    for (auto& e : enemies_) if (e->IsAlive()) fn(*e);
+    for (auto& f : friends_) fn(*f);
+}
+
+void Game::DealDamage(Robot& target, int damage) {
+    target.ApplyDamage(damage);   // from statuses (shield)
+}
+
+bool Game::TeleportRobot(Robot& robot, int x, int y) {
+    if (!field_.IsPassable(x, y)) return false;
+    if (IsOccupiedExcept(x, y, &robot)) return false;
+    robot.SetPosition(x, y);
+    field_.ApplyCellStatusesTo(robot, x, y);
+    field_.RemoveRandomStatusFromCell(x, y);
+    return true;
+}
+
+// for player
+bool Game::PlayerUseAbility(AbilityKind kind, int tx, int ty) {
+    return player_->TryUseAbility(*this, kind, tx, ty);
+}
+
+// inventory
+void Game::AddItem(ItemKind kind) {
+    inventory_.push_back(Item(kind));
+}
+
+bool Game::UseItem(std::size_t index) {
+    if (index >= inventory_.size()) return false;
+    ItemKind kind = inventory_[index].GetKind();
+    switch (kind) {
+        case ItemKind::kHealthPotion:
+            player_->Heal(kHealthPotionHeal);
+            break;
+        case ItemKind::kEnergyPotion:
+            player_->RegenerateEnergy(kEnergyPotionRegen);
+            break;
+        case ItemKind::kAttackBoost:
+            player_->AddStatus(CreateAttackBoostStatus(kAttackBoostBonus, kAttackBoostTurns));
+            break;
+    }
+    inventory_.erase(inventory_.begin() + index);
+    return true;
+}
+
+ItemKind Game::RandomItemKind() {
+    switch (std::rand() % 3) {
+        case 0: return ItemKind::kHealthPotion;
+        case 1: return ItemKind::kEnergyPotion;
+        default: return ItemKind::kAttackBoost;
+    }
+}
+
+// statuses
+void Game::GenerateCellStatuses() {
+    for (int y = 0; y < field_.GetHeight(); ++y) {
+        for (int x = 0; x < field_.GetWidth(); ++x) {
+            if (!field_.IsPassable(x, y)) continue;
+            int roll = std::rand() % 100;
+            if (roll < kChanceTwoStatuses) {
+                // 10% — два статуса
+                field_.AddStatusToCell(x, y, RandomStatus());
+                field_.AddStatusToCell(x, y, RandomStatus());
+            } else if (roll < kChanceTwoStatuses + kChanceOneStatus) {
+                // 15% — один статус
+                field_.AddStatusToCell(x, y, RandomStatus());
+            }
+            // остальные 75% — без статусов
+        }
+    }
+}
+
+std::unique_ptr<IStatus> Game::RandomStatus() {
+    switch (std::rand() % 5) {
+        case 0: return CreateSlowStatus();
+        case 1: return CreateOverloadStatus();
+        case 2: return CreateBurningStatus(kBurningCellTurns, kBurningCellDamage);
+        case 3: return CreateShieldStatus(kShieldCellAmount);
+        default: return CreateItemPickupStatus();   // 20% — предмет
+    }
+}
+
+
+void Game::SetRankUpChoice(std::function<void(Robot&)> cb) {
+    rank_up_choice_ = std::move(cb);
+    player_->SetRankUpCallback([this](Robot& r) {
+        if (rank_up_choice_) rank_up_choice_(r);
+    });
 }
 
 }

@@ -1,6 +1,11 @@
 #include "robot.h"
 
 #include <algorithm>
+#include <utility>
+
+#include "ability.h"
+#include "game.h"
+#include "status.h"
 
 namespace lab2 {
 
@@ -15,10 +20,16 @@ namespace {
     constexpr int kMinExperienceToRankUp = 1;
     constexpr int kMinSpeed = 1;
     constexpr int kMinVisibilityRadius = 0;
-    constexpr int kMinAttack = 0; 
-    constexpr int kMinExperience = 0; 
+    constexpr int kMinAttack = 0;
+    constexpr int kMinExperience = 0;
 
     constexpr int kHealAmount = 10;
+
+
+    bool SameAbility(const ISpecialAbility& a, AbilityKind kind) {
+        auto probe = CreateAbility(kind);
+        return probe && a.GetName() == probe->GetName();
+    }
 }
 
 Robot::Robot(const std::string& name, int health, int max_health,
@@ -33,16 +44,16 @@ Robot::Robot(const std::string& name, int health, int max_health,
         max_energy_(kMinEnergy),
         experience_(0),
         experience_to_rank_up_(kMinExperienceToRankUp),
-        rank_(1), 
+        rank_(1),
         speed_(kMinSpeed),
         visibility_radius_(kMinVisibilityRadius),
-        x_(0), y_(0){
+        x_(0), y_(0) {
     SetMaxHealth(max_health);
     SetMaxEnergy(max_energy);
     SetExperienceToRankUp(experience_to_rank_up);
     SetSpeed(speed);
     SetVisibilityRadius(visibility_radius);
-    
+
     SetHealth(health);
     SetAttack(attack);
     SetEnergy(energy);
@@ -131,7 +142,7 @@ void Robot::RegenerateEnergy(int amount) {
 }
 
 void Robot::TakeDamage(int damage) {
-    if(damage <= 0) return;
+    if (damage <= 0) return;
     SetHealth(health_ - damage);
 }
 
@@ -154,7 +165,106 @@ void Robot::TryRankUp() {
         SetAttack(attack_ + kAttackBonusPerRank);
         SetMaxEnergy(max_energy_ + kEnergyBonusPerRank);
         SetEnergy(max_energy_);
+
+        if (rank_up_callback_) rank_up_callback_(*this);
     }
+}
+
+// statuses
+bool Robot::IsMovementBlocked() const {
+    for (const auto& s : statuses_) if (s->BlocksMovement()) return true;
+    return false;
+}
+bool Robot::AreAbilitiesBlocked() const {
+    for (const auto& s : statuses_) if (s->BlocksAbilities()) return true;
+    return false;
+}
+
+bool Robot::HasStatus(const std::string& name) const {
+    for (const auto& s : statuses_) if (s->GetName() == name) return true;
+    return false;
+}
+
+void Robot::AddStatus(std::unique_ptr<IStatus> status) {
+    if (!status) return;
+    if (status->GetName() == "Перегрузка") {
+        for (auto& s : statuses_)
+            if (s->GetName() == "Перегрузка") return;   // одна
+    }
+    status->OnApply(*this);
+    statuses_.push_back(std::move(status));
+}
+
+void Robot::OnAbilityAttempted() {
+    for (auto it = statuses_.begin(); it != statuses_.end(); ) {
+        if ((*it)->OnAbilityUsed()) it = statuses_.erase(it);
+        else ++it;
+    }
+}
+
+void Robot::EndTurn() {
+    for (auto it = statuses_.begin(); it != statuses_.end(); ) {
+        if ((*it)->OnTurnEnd(*this)) it = statuses_.erase(it);
+        else ++it;
+    }
+}
+
+void Robot::ApplyDamage(int damage) {
+    if (damage <= 0) return;
+    int remaining = damage;
+    for (auto it = statuses_.begin(); it != statuses_.end(); ) {
+        remaining = (*it)->OnDamageTaken(remaining);
+        if ((*it)->ShouldRemoveAfterDamage()) it = statuses_.erase(it);
+        else ++it;
+        if (remaining <= 0) break;
+    }
+    if (remaining > 0) TakeDamage(remaining);
+}
+
+// abilities
+bool Robot::HasAbility(AbilityKind kind) const {
+    for (const auto& a : abilities_) if (SameAbility(*a, kind)) return true;
+    return false;
+}
+
+void Robot::AddAbility(AbilityKind kind) {
+    if (!HasAbility(kind)) abilities_.push_back(CreateAbility(kind));
+}
+
+bool Robot::TryUseAbility(Game& game, AbilityKind kind, int tx, int ty) {
+    if (!IsAlive()) return false;
+    if (AreAbilitiesBlocked()) { OnAbilityAttempted(); return false; }
+
+    for (auto& a : abilities_) {
+        if (!SameAbility(*a, kind)) continue;
+        if (!a->CanUse(*this, game, tx, ty)) return false;
+        if (GetEnergy() < a->GetEnergyCost()) return false;
+        SetEnergy(GetEnergy() - a->GetEnergyCost());
+        a->Use(*this, game, tx, ty);
+        return true;
+    }
+    return false;
+}
+
+void Robot::UpgradeAbility(AbilityKind kind) {
+    for (auto& a : abilities_) {
+        if (SameAbility(*a, kind) && a->IsUpgradable()) {
+            a->Upgrade();
+            return;
+        }
+    }
+}
+
+const std::vector<std::unique_ptr<ISpecialAbility>>& Robot::GetAbilities() const {
+    return abilities_;
+}
+
+const std::vector<std::unique_ptr<IStatus>>& Robot::GetStatuses() const {
+    return statuses_;
+}
+
+void Robot::SetRankUpCallback(std::function<void(Robot&)> cb) {
+    rank_up_callback_ = std::move(cb);
 }
 
 }

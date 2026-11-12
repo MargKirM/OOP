@@ -1,14 +1,17 @@
-TARGET = lab1
+TARGET = lab2
 CXX = g++
 CXXFLAGS = -std=c++17 -Wall -Wextra -g
 
 SOURCES = main.cpp \
-		  cell.cpp  \
-		  game_field.cpp \
-		  robot.cpp \
-		  robot_factory.cpp \
-		  game.cpp \
-		  console_renderer.cpp
+          cell.cpp \
+          game_field.cpp \
+          robot.cpp \
+          robot_factory.cpp \
+          game.cpp \
+          console_renderer.cpp \
+          ability.cpp \
+          status.cpp \
+          item.cpp
 
 OBJDIR = objdir
 OBJECTS := $(addprefix $(OBJDIR)/,$(patsubst %.cpp, %.o, $(SOURCES)))
@@ -24,7 +27,7 @@ $(OBJDIR):
 	mkdir -p $@
 
 $(OBJDIR)/%.o: %.cpp
-	$(CC) $(CFLAGS) -o $@ -c $<
+	$(CXX) $(CXXFLAGS) -o $@ -c $<
 
 clean:
 	rm -rf $(TARGET) $(OBJDIR)

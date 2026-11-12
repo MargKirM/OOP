@@ -6,7 +6,7 @@ namespace {
     constexpr int kMinPeriod = 8;
 }
 
-RobotFactory::RobotFactory(int x, int y, int period) : 
+RobotFactory::RobotFactory(int x, int y, int period) :
     x_(x), y_(y), period_(period < kMinPeriod ? kMinPeriod : period),
     counter_(0) {}
 
