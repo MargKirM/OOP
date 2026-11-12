@@ -28,7 +28,7 @@ public:
 
     ~Game() = default; // destructor
 
-    void ConfigureDemo(AbilityKind start_ability = AbilityKind::kAreaStrike);
+    // void ConfigureDemo(AbilityKind start_ability = AbilityKind::kAreaStrike);
     void Step(Direction direction);
     bool IsLevelComplete() const;
     void EndPlayerTurn();
@@ -68,13 +68,12 @@ public:
 
     // for abilities
     void ForEachRobot(const std::function<void(Robot&)>& fn) const;
-    void DealDamage(Robot& target, int damage);
     bool TeleportRobot(Robot& robot, int x, int y);
 
     bool IsOccupiedExcept(int x, int y, const Robot* except) const;
 
     // for player
-    bool PlayerUseAbility(AbilityKind kind, int tx, int ty);
+    // bool PlayerUseAbility(AbilityKind kind, int tx, int ty);
 
     // only player
     const std::vector<Item>& GetInventory() const { return inventory_; }

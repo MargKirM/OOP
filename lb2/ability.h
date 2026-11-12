@@ -3,28 +3,65 @@
 
 #include <memory>
 #include <string>
+#include "robot.h"
+#include "game.h"
 
 namespace lab2 {
 
-class Robot;
-class Game;
 
-enum class AbilityKind {
-    kAreaStrike, kRangedStrike, kHeal, kTeleport
-};
-
-class ISpecialAbility { // virtual class-interface
+class IAbility { // virtual class-interface
 public:
     virtual const std::string& GetName() const = 0;
-    virtual int GetEnergyCost() const = 0;
-    virtual bool CanUse(const Robot& owner, const Game& game,  int tx, int ty) const = 0;
-    virtual void Use(Robot& owner, Game& game, int tx, int ty) const = 0;
-    virtual void Upgrade() = 0;
-    virtual bool IsUpgradable() const = 0;
+    virtual void apply(Robot& robot) = 0;
+    virtual int energyCost() = 0;
+    virtual void modify(int value) = 0;
 };
 
-std::unique_ptr<ISpecialAbility> CreateAbility(AbilityKind kind);
-const char* AbilityName(AbilityKind kind);
+class RoundStrike : public IAbility {
+public:
+    RoundStrike(Game& game);
+
+    const std::string& GetName() const override;
+    void apply(Robot& robot) override;
+    int energyCost() override;
+    void modify(int value) override;
+
+private:
+    Game& game_;
+    int radius_;
+};
+class FarStrike : public IAbility {
+public:
+    FarStrike(Game& game): game_(game) {}
+
+    const std::string& GetName() const override;
+    void apply(Robot& robot) override;
+    int energyCost() override;
+    void modify(int value) override;
+
+private:
+    Game& game_;
+};
+class Heal : public IAbility {
+public:
+    Heal() = default;
+
+    const std::string& GetName() const override;
+    void apply(Robot& robot) override;
+    int energyCost() override;
+    void modify(int value) override;
+};
+class Teleport : public IAbility {
+public:
+    Teleport(Game& game): game_(game) {}
+
+    const std::string& GetName() const override;
+    void apply(Robot& robot) override;
+    void modify(int value) override;
+
+private:
+    Game& game_;
+};
 }
 
 #endif

@@ -416,9 +416,6 @@ void Game::ForEachRobot(const std::function<void(Robot&)>& fn) const{
     for (auto& f : friends_) fn(*f);
 }
 
-void Game::DealDamage(Robot& target, int damage) {
-    target.ApplyDamage(damage);   // from statuses (shield)
-}
 
 bool Game::TeleportRobot(Robot& robot, int x, int y) {
     if (!field_.IsPassable(x, y)) return false;

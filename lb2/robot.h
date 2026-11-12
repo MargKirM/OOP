@@ -11,7 +11,6 @@
 
 namespace lab2 {
 
-class Game;
 class Robot {
 public:
     Robot(const std::string& name, int health, int max_health, int attack,
@@ -72,13 +71,6 @@ public:
     void OnAbilityAttempted();
     void EndTurn();
     void ApplyDamage(int damage);
-
-    // abilities
-    bool HasAbility(AbilityKind kind) const;
-    void AddAbility(AbilityKind kind);
-    bool TryUseAbility(Game& game, AbilityKind kind, int tx, int ty);
-    void UpgradeAbility(AbilityKind kind);
-    const std::vector<std::unique_ptr<ISpecialAbility>>& GetAbilities() const;
 
     // rank
     void SetRankUpCallback(std::function<void(Robot&)> cb);
