@@ -9,8 +9,8 @@ namespace lab2 {
 namespace {
     const char* kReset  = "\033[0m";
     const char* kRed    = "\033[31m";
-    const char* kGray   = "\033[90m";
-    const char* kYellow = "\033[33m";
+    const char* kBlue   = "\033[1;94m";
+    const char* kStatusCell = "\033[30;102m";
 }
 
 ConsoleRenderer::ConsoleRenderer(const Game& game) : game_(game) {}
@@ -84,9 +84,13 @@ void ConsoleRenderer::Render() const {
 
             if (ShouldHighlight(x, y)) { //Highlighting
                 const char* color = kRed;
-                if (mode_ == RenderMode::kHighlightWalls)        color = kGray;
-                if (mode_ == RenderMode::kHighlightStatusCells)  color = kYellow;
-                std::cout << color << sym << kReset << ' ';
+                if (mode_ == RenderMode::kHighlightWalls) color = kBlue;
+                if (mode_ == RenderMode::kHighlightStatusCells) {
+                    color = kStatusCell;
+                    std::cout << color << sym << ' ' << kReset;
+                } else {
+                    std::cout << color << sym << kReset << ' ';
+                }
             } else {
                 std::cout << sym << ' ';
             }
@@ -98,6 +102,9 @@ void ConsoleRenderer::Render() const {
                  "@ — фабрика роботов, x — убитый враг, t — убитый игрок, "
                  "# — стена, ? — не исследована, "
                  "~ — болото (3), ^ — грязь (2)\n";
+    if (mode_ == RenderMode::kHighlightStatusCells) {
+        std::cout << "Светло-зелёный фон — клетка со статусом\n";
+    }
 
     const Robot& player = game_.GetPlayer();
 

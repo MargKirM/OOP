@@ -21,7 +21,7 @@ public:
 
     void AddStatus(std::unique_ptr<IStatus> status);
     void RemoveRandomStatus();
-    void ApplyTo(Robot& robot) const;
+    void ApplyRandomStatusTo(Robot& robot);
 
 
     std::size_t GetStatusCount() const;

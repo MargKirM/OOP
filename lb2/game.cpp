@@ -212,8 +212,7 @@ bool Game::TryMoveRobot(Robot& robot, int x, int y) {
 
     robot.SetEnergy(robot.GetEnergy() - kMoveEnergyCost);
     robot.SetPosition(x, y);
-    field_.ApplyCellStatusesTo(robot, x, y);     // apply statuses (robot)
-    field_.RemoveRandomStatusFromCell(x, y);     // remove status (cell)
+    field_.ApplyRandomCellStatusTo(robot, x, y);
     return true;
 }
 
@@ -427,8 +426,7 @@ bool Game::TeleportRobot(Robot& robot, int x, int y) {
     if (!field_.IsPassable(x, y)) return false;
     if (IsOccupiedExcept(x, y, &robot)) return false;
     robot.SetPosition(x, y);
-    field_.ApplyCellStatusesTo(robot, x, y);
-    field_.RemoveRandomStatusFromCell(x, y);
+    field_.ApplyRandomCellStatusTo(robot, x, y);
     return true;
 }
 

@@ -40,10 +40,12 @@ void Cell::RemoveRandomStatus() {
     statuses_.erase(statuses_.begin() + idx);
 }
 
-void Cell::ApplyTo(Robot& robot) const {
-    for (const auto& s : statuses_) {
-        if (s) robot.AddStatus(s->Clone());
-    }
+void Cell::ApplyRandomStatusTo(Robot& robot) {
+    if (statuses_.empty()) return;
+    const std::size_t idx =
+        static_cast<std::size_t>(std::rand()) % statuses_.size();
+    robot.AddStatus(statuses_[idx]->Clone());
+    statuses_.erase(statuses_.begin() + idx);
 }
 
 std::size_t Cell::GetStatusCount() const {

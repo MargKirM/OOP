@@ -84,9 +84,24 @@ void TestGameField() {
     f.AddStatusToCell(1, 1, CreateShieldStatus(10));
     f.AddStatusToCell(1, 1, CreateOverloadStatus());  // третий не добавится
     assert(f.GetCellStatusCount(1, 1) == 2);
-    f.RemoveRandomStatusFromCell(1, 1);
     assert(f.GetCellStatusCount(1, 1) == 1);
     std::cout << "cell statuses apply/remove: ok\n";
+
+    Robot first("First", 100, 100, 10, 50, 50, 0, 100, 3, 2);
+    Robot second("Second", 100, 100, 10, 50, 50, 0, 100, 3, 2);
+    f.AddStatusToCell(2, 2, CreateSlowStatus());
+    f.AddStatusToCell(2, 2, CreateOverloadStatus());
+    f.ApplyRandomCellStatusTo(first, 2, 2);
+    assert(first.GetStatuses().size() == 1);
+    assert(f.GetCellStatusCount(2, 2) == 1);
+    f.ApplyRandomCellStatusTo(second, 2, 2);
+    assert(second.GetStatuses().size() == 1);
+    assert(f.GetCellStatusCount(2, 2) == 0);
+    assert(first.GetStatuses()[0]->GetName() != second.GetStatuses()[0]->GetName());
+    f.ApplyRandomCellStatusTo(second, 2, 2);
+    f.ApplyRandomCellStatusTo(second, -1, 2);
+    assert(second.GetStatuses().size() == 1);
+    std::cout << "random status: only selected status applied and removed, empty cell safe\n";
 }
 
 // ============ Robot ============

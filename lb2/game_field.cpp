@@ -55,12 +55,8 @@ void GameField::AddStatusToCell(int x, int y, std::unique_ptr<IStatus> status) {
     if (IsInside(x, y)) cells_[y][x].AddStatus(std::move(status));
 }
 
-void GameField::ApplyCellStatusesTo(Robot& robot, int x, int y) const {
-    if (IsInside(x, y)) cells_[y][x].ApplyTo(robot);
-}
-
-void GameField::RemoveRandomStatusFromCell(int x, int y) {
-    if (IsInside(x, y)) cells_[y][x].RemoveRandomStatus();
+void GameField::ApplyRandomCellStatusTo(Robot& robot, int x, int y) {
+    if (IsInside(x, y)) cells_[y][x].ApplyRandomStatusTo(robot);
 }
 
 std::size_t GameField::GetCellStatusCount(int x, int y) const {
