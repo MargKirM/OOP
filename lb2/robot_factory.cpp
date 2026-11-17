@@ -24,7 +24,7 @@ int RobotFactory::GetCounter() const {
     return counter_;
 }
 
-bool RobotFactory::ToMakeRobot() {
+bool RobotFactory::CanMakeRobot() {
     ++counter_;
     if(counter_ >= period_) {
         counter_ = 0;

@@ -44,16 +44,15 @@ namespace {
         void Use(Robot& owner, Game& game, int, int) const override {
             const int ox = owner.GetX();
             const int oy = owner.GetY();
-            game.ForEachRobot([&](Robot& robot) {
-                if (&robot == &owner) return;
-                if (!robot.IsAlive()) return;
-                if (game.IsFriend(robot)) return;
-                if (std::abs(robot.GetX() - ox) <= radius_ &&
-                    std::abs(robot.GetY() - oy) <= radius_) {
-                    game.DealDamage(robot, kAreaStrikeDamage);
-                    robot.AddStatus(CreateOverloadStatus());   // + Перегрузка
+            for (Robot* robot : game.GetRobots()) {
+                if (robot == &owner) continue;
+                if (game.IsFriend(*robot)) continue;
+                if (std::abs(robot->GetX() - ox) <= radius_ &&
+                    std::abs(robot->GetY() - oy) <= radius_) {
+                    game.DealDamage(*robot, kAreaStrikeDamage);
+                    robot->AddStatus(CreateOverloadStatus());   // + Перегрузка
                 }
-            });
+            }
         }
 
         void Upgrade() override {
@@ -80,28 +79,25 @@ namespace {
             if (std::abs(tx - owner.GetX()) > kRangedStrikeRange) return false;
             if (std::abs(ty - owner.GetY()) > kRangedStrikeRange) return false;
 
-            bool found = false;
-            game.ForEachRobot([&](Robot& robot) {
-                if (&robot == &owner) return;
-                if (game.IsFriend(robot)) return;
-                if (robot.IsAlive() &&
-                    robot.GetX() == tx && robot.GetY() == ty) {
-                    found = true;
+            for (Robot* robot : game.GetRobots()) {
+                if (robot == &owner) continue;
+                if (game.IsFriend(*robot)) continue;
+                if (robot->GetX() == tx && robot->GetY() == ty) {
+                    return true;
                 }
-            });
-            return found;
+            }
+            return false;
         }
 
         void Use(Robot& owner, Game& game, int tx, int ty) const override {
             Robot* target = nullptr;
-            game.ForEachRobot([&](Robot& robot) {
-                if (&robot == &owner) return;
-                if (game.IsFriend(robot)) return;
-                if (robot.IsAlive() &&
-                    robot.GetX() == tx && robot.GetY() == ty) {
-                    target = &robot;
+            for (Robot* robot : game.GetRobots()) {
+                if (robot == &owner) continue;
+                if (game.IsFriend(*robot)) continue;
+                if (robot->GetX() == tx && robot->GetY() == ty) {
+                    target = robot;
                 }
-            });
+            }
             if (target) {
                 game.DealDamage(*target, damage_);
                 target->AddStatus(CreateBurningStatus(kBurningAbilityTurns, kBurningAbilityDamage));   // + Burning

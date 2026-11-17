@@ -175,15 +175,15 @@ void TestRobotFactory() {
 
     // Period
     for (int i = 0; i < 7; ++i) {
-        assert(f.ToMakeRobot() == false);
+        assert(f.CanMakeRobot() == false);
     }
-    assert(f.ToMakeRobot() == true);   // 8th turn
+    assert(f.CanMakeRobot() == true);   // 8th turn
     std::cout << "ToMakeRobot every 8 turns: ok\n";
 
     // Reset
     RobotFactory f3(0, 0, 8);
     f3.ResetCounter();
-    assert(f3.ToMakeRobot() == true);   // immediately after Reset
+    assert(f3.CanMakeRobot() == true);   // immediately after Reset
     std::cout << "ResetCounter: ok\n";
 }
 
@@ -202,9 +202,6 @@ void TestGame() {
     assert(game.GetEnemies().size() == 3);
     assert(game.GetFriends().size() == 1);
     std::cout << "enemies: 3, friends: 1\n";
-
-    assert(game.GetFactories().size() == 1);
-    std::cout << "factory: 1\n";
 
     assert(game.IsLevelComplete() == false);
     std::cout << "level not complete: ok\n";
@@ -254,6 +251,29 @@ void TestAbilities() {
     game.ConfigureDemo();
     assert(game.GetPlayer().HasAbility(AbilityKind::kAreaStrike));
     std::cout << "start ability: ok\n";
+
+    Robot& player = game.GetPlayer();
+    Robot& enemy = *game.GetEnemies()[0];
+    Robot& friend_robot = *game.GetFriends()[0];
+    player.SetPosition(1, 1);
+    friend_robot.SetPosition(1, 2);
+    const int player_health = player.GetHealth();
+    const int friend_health = friend_robot.GetHealth();
+    const int enemy_health = enemy.GetHealth();
+
+    assert(game.PlayerUseAbility(AbilityKind::kAreaStrike, 0, 0));
+    assert(enemy.GetHealth() == enemy_health - 8);
+    assert(enemy.AreAbilitiesBlocked());
+    assert(player.GetHealth() == player_health);
+    assert(friend_robot.GetHealth() == friend_health);
+
+    player.AddAbility(AbilityKind::kRangedStrike);
+    assert(!game.PlayerUseAbility(AbilityKind::kRangedStrike, 1, 2));
+    assert(game.PlayerUseAbility(AbilityKind::kRangedStrike, enemy.GetX(), enemy.GetY()));
+    assert(enemy.GetHealth() == enemy_health - 8 - 12);
+    enemy.SetHealth(0);
+    assert(!game.PlayerUseAbility(AbilityKind::kRangedStrike, enemy.GetX(), enemy.GetY()));
+    std::cout << "strikes: damage enemies, spare owner and friends, skip dead targets\n";
 }
 
 // ============ Statuses ============

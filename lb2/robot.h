@@ -1,7 +1,6 @@
 #ifndef LAB1_ROBOT_H_
 #define LAB1_ROBOT_H_
 
-#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -53,7 +52,6 @@ public:
     void SetAttack(int attack);
     void SetEnergy(int energy);
     void SetMaxEnergy(int max_energy);
-    void SetExperienceToRankUp(int experience_to_rank_up);
     void SetSpeed(int speed);
     void SetExperience(int experience);
     void SetVisibilityRadius(int radius);
@@ -80,9 +78,6 @@ public:
     void UpgradeAbility(AbilityKind kind);
     const std::vector<std::unique_ptr<ISpecialAbility>>& GetAbilities() const;
 
-    // rank
-    void SetRankUpCallback(std::function<void(Robot&)> cb);
-
 private:
     void TryRankUp(); // if necessary experience is
 
@@ -104,7 +99,6 @@ private:
 
     std::vector<std::unique_ptr<ISpecialAbility>> abilities_;
     std::vector<std::unique_ptr<IStatus>> statuses_;
-    std::function<void(Robot&)> rank_up_callback_;
 };
 
 }

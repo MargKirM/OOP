@@ -12,7 +12,7 @@ public:
     int GetPeriod() const; // how many turns between creates
     int GetCounter() const; // count of passed turns
 
-    bool ToMakeRobot();
+    bool CanMakeRobot();
 
     bool Occupies(int x, int y) const;
 

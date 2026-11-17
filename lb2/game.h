@@ -1,7 +1,6 @@
 #ifndef LAB1_GAME_H_
 #define LAB1_GAME_H_
 
-#include <functional>
 #include <memory>
 #include <utility>
 #include <vector>
@@ -36,7 +35,8 @@ public:
     const GameField& GetField() const {
         return field_;
     }
-    const Robot& GetPlayer() const {
+
+    Robot& GetPlayer() const {
         return *player_;
     }
 
@@ -48,8 +48,8 @@ public:
         return friends_;
     }
 
-    const std::vector<std::unique_ptr<RobotFactory>>& GetFactories() const {
-        return factories_;
+    RobotFactory& GetFactory() const {
+        return *robotFactory_;
     }
 
     std::pair<int, int> GetPlayerPosition() const {
@@ -67,7 +67,7 @@ public:
     }
 
     // for abilities
-    void ForEachRobot(const std::function<void(Robot&)>& fn) const;
+    std::vector<Robot*> GetRobots() const;
     void DealDamage(Robot& target, int damage);
     bool TeleportRobot(Robot& robot, int x, int y);
 
@@ -80,9 +80,6 @@ public:
     const std::vector<Item>& GetInventory() const { return inventory_; }
     void AddItem(ItemKind kind);
     bool UseItem(std::size_t index);
-
-    // choose ability and rank up
-    void SetRankUpChoice(std::function<void(Robot&)> cb);
 
 private:
     void GenerateEnemies(int count);
@@ -97,14 +94,13 @@ private:
     bool TryAttack(Robot& attacker, int x, int y);
     bool TryMoveRobot(Robot& robot, int x, int y);
     bool TryMovePlayer(int x, int y);
-    bool TryMoveEnemy(std::size_t index, int x, int y);
-    bool TryMoveFriend(std::size_t index, int x, int y);
+    bool TryMoveEnemy(Robot& enemy, int x, int y);
+    bool TryMoveFriend(Robot& friendRobot, int x, int y);
     void UpdateVisibility();
 
     bool IsEnemyAt(int x, int y) const;
 
-    void StepFactories();
-    void GeneratorEnemyFromFactory(RobotFactory& factory);
+    void GenerateEnemyFromFactory();
 
     void GenerateCellStatuses();
     std::unique_ptr<IStatus> RandomStatus();
@@ -117,11 +113,9 @@ private:
     std::vector<std::unique_ptr<Robot>> enemies_;
     std::vector<std::unique_ptr<Robot>> friends_;
 
-    std::vector<std::unique_ptr<RobotFactory>> factories_;
+    std::unique_ptr<RobotFactory> robotFactory_;
 
     std::vector<Item> inventory_;   // player
-
-    std::function<void(Robot&)> rank_up_choice_;
 };
 
 }

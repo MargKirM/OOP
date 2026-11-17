@@ -37,7 +37,6 @@ Game::Game(int width, int height) : field_(width, height),
 }
 
 void Game::ConfigureDemo(AbilityKind start_ability) {
-
     int fx = field_.GetWidth() / 2 - 1; // place of factory
     int fy = field_.GetHeight() / 2 - 1;
 
@@ -47,7 +46,7 @@ void Game::ConfigureDemo(AbilityKind start_ability) {
         }
     }
 
-    factories_.push_back(std::make_unique<RobotFactory>(fx, fy, 5));
+    robotFactory_ = std::make_unique<RobotFactory>(fx, fy, 5);
 
     field_.SetPassable(1, 1, false); // walls
     field_.SetPassable(2, 2, false);
@@ -232,18 +231,18 @@ bool Game::TryMovePlayer(int x, int y) {
     return TryMoveRobot(*player_, x, y);
 }
 
-bool Game::TryMoveEnemy(std::size_t index, int x, int y) {
+bool Game::TryMoveEnemy(Robot& enemy, int x, int y) {
     if (player_->GetX() == x && player_->GetY() == y) {
         if(!player_->IsAlive()) return false;
-        return TryAttack(*enemies_[index], x, y);
+        return TryAttack(enemy, x, y);
     }
-    return TryMoveRobot(*enemies_[index], x, y);
+    return TryMoveRobot(enemy, x, y);
 }
 
-bool Game::TryMoveFriend(std::size_t index, int x, int y) {
+bool Game::TryMoveFriend(Robot& friendRobot, int x, int y) {
     if (player_->GetX() == x && player_->GetY() == y) return false;
 
-    return TryMoveRobot(*friends_[index], x, y);
+    return TryMoveRobot(friendRobot, x, y);
 }
 
 void Game::StepPlayer(Direction direction) {
@@ -274,16 +273,18 @@ void Game::StepPlayer(Direction direction) {
 void Game::StepEnemies() {
     if (!player_->IsAlive()) return;
 
-    for (std::size_t i = 0; i < enemies_.size(); ++i) {
-        if (!enemies_[i]->IsAlive()) continue;
+    for (auto& enemy : enemies_) {
+        if (!enemy->IsAlive()) continue;
 
-        int budget = enemies_[i]->GetSpeed();
+        int budget = enemy->GetSpeed();
+        int playerX = player_->GetX();
+        int playerY = player_->GetY(); 
 
         while(budget > 0) {
-            int dx = player_->GetX() - enemies_[i]->GetX();
-            int dy = player_->GetY() - enemies_[i]->GetY();
-            int x = enemies_[i]->GetX();
-            int y = enemies_[i]->GetY();
+            int x = enemy->GetX();
+            int y = enemy->GetY();
+            int dx = playerX - x;
+            int dy = playerY - y;
 
             if (std::abs(dx) > std::abs(dy)) {
                 x += (dx > 0) ? 1 : -1;
@@ -294,7 +295,7 @@ void Game::StepEnemies() {
             int cost = field_.GetPassCost(x, y);
             if (cost > budget) break;
 
-            if(!TryMoveEnemy(i, x, y)) break;
+            if (!TryMoveEnemy(*enemy, x, y)) break;
 
             budget -= cost;
         }
@@ -302,29 +303,35 @@ void Game::StepEnemies() {
 }
 
 void Game::StepFriends() {
-    for (std::size_t i = 0; i < friends_.size(); ++i) {
-        if (!friends_[i]->IsAlive()) continue;
+    for (auto& friendRobot : friends_) {
+        if (!friendRobot->IsAlive()) continue;
 
-        int budget = friends_[i]->GetSpeed();
+        int budget = friendRobot->GetSpeed();
+        int playerX = player_->GetX();
+        int playerY = player_->GetY(); 
+
         while (budget > 0) {
-            int dx = player_->GetX() - friends_[i]->GetX();
-            int dy = player_->GetY() - friends_[i]->GetY();
+            int x = friendRobot->GetX();
+            int y = friendRobot->GetY();
+
+            int dx = playerX - x;
+            int dy = playerY - y;
 
             if (std::abs(dx) + std::abs(dy) == 1) { // heals player
-                friends_[i]->Interact(*player_, false);
+                friendRobot->Interact(*player_, false);
                 break;
             }
 
-            int x = friends_[i]->GetX();
-            int y = friends_[i]->GetY();
-            if (std::abs(dx) > std::abs(dy)) x += (dx > 0) ? 1 : -1;
-            else if (dy != 0)               y += (dy > 0) ? 1 : -1;
-            else break;
+            if (std::abs(dx) > std::abs(dy)) {
+                x += (dx > 0) ? 1 : -1;
+            } else if (dy != 0) {
+                y += (dy > 0) ? 1 : -1;
+            } else break;
 
             int cost = field_.GetPassCost(x, y);
             if (cost > budget) break;
 
-            if (!TryMoveFriend(i, x, y)) break;
+            if (!TryMoveFriend(*friendRobot, x, y)) break;
             budget -= cost;
         }
     }
@@ -347,7 +354,7 @@ void Game::RegenerateEnergy() {
 void Game::EndPlayerTurn() {
     StepEnemies();
     StepFriends();
-    if (!IsLevelComplete()) StepFactories();
+    if (!IsLevelComplete()) GenerateEnemyFromFactory();
     RegenerateEnergy();
 
     if (player_->HasStatus("Получение предмета")) {  // ItemPickup only for player
@@ -375,45 +382,41 @@ bool Game::IsLevelComplete() const {
     return true;
 }
 
-void Game::StepFactories() {
-    for (auto& factory : factories_) {
-        if (factory->ToMakeRobot()) {
-            GeneratorEnemyFromFactory(*factory);
+void Game::GenerateEnemyFromFactory() {
+    if (robotFactory_ && robotFactory_->CanMakeRobot()) {
+        int fx = robotFactory_->GetX();
+        int fy = robotFactory_->GetY();
+    
+        for (int dy = -1; dy <= 2; dy++) { //go around factory
+            for (int dx = -1; dx <= 2; dx++) {
+                int x = fx + dx;
+                int y = fy + dy;
+    
+                if (!field_.IsInside(x, y)) continue;
+                if (robotFactory_->Occupies(x, y)) continue;
+                if (!field_.IsPassable(x, y)) continue; // walls
+                if (IsOccupiedExcept(x, y, nullptr)) continue; //anyone is excepted
+    
+                std::string name = "Enemy_" + std::to_string(enemies_.size());
+    
+                auto new_enemy = std::make_unique<Robot>(name, 40, 40, 5, 30, 30, 0, 100, 3, 1);
+                new_enemy->SetPosition(x, y);
+                new_enemy->AddAbility((std::rand() % 2) ? AbilityKind::kHeal : AbilityKind::kTeleport);
+                enemies_.push_back(std::move(new_enemy));
+                return;
+            }
         }
+        robotFactory_->ResetCounter(); // place for generating is not found
     }
-}
-
-void Game::GeneratorEnemyFromFactory(RobotFactory& factory) {
-    int fx = factory.GetX();
-    int fy = factory.GetY();
-
-    for (int dy = -1; dy <= 2; dy++) { //go around factory
-        for (int dx = -1; dx <= 2; dx++) {
-            int x = fx + dx;
-            int y = fy + dy;
-
-            if (!field_.IsInside(x, y)) continue;
-            if (factory.Occupies(x, y)) continue;
-            if (!field_.IsPassable(x, y)) continue; // walls
-            if (IsOccupiedExcept(x, y, nullptr)) continue; //anyone is excepted
-
-            std::string name = "Enemy_" + std::to_string(enemies_.size());
-
-            auto new_enemy = std::make_unique<Robot>(name, 40, 40, 5, 30, 30, 0, 100, 3, 1);
-            new_enemy->SetPosition(x, y);
-            new_enemy->AddAbility((std::rand() % 2) ? AbilityKind::kHeal : AbilityKind::kTeleport);
-            enemies_.push_back(std::move(new_enemy));
-            return;
-        }
-    }
-    factory.ResetCounter(); // place for generating is not found
 }
 
 // for abilities
-void Game::ForEachRobot(const std::function<void(Robot&)>& fn) const{
-    if (player_->IsAlive()) fn(*player_);
-    for (auto& e : enemies_) if (e->IsAlive()) fn(*e);
-    for (auto& f : friends_) fn(*f);
+std::vector<Robot*> Game::GetRobots() const {
+    std::vector<Robot*> robots;
+    if (player_->IsAlive()) robots.push_back(player_.get());
+    for (const auto& e : enemies_) if (e->IsAlive()) robots.push_back(e.get());
+    for (const auto& f : friends_) if (f->IsAlive()) robots.push_back(f.get());
+    return robots;
 }
 
 void Game::DealDamage(Robot& target, int damage) {
@@ -493,13 +496,4 @@ std::unique_ptr<IStatus> Game::RandomStatus() {
         default: return CreateItemPickupStatus();   // 20% — предмет
     }
 }
-
-
-void Game::SetRankUpChoice(std::function<void(Robot&)> cb) {
-    rank_up_choice_ = std::move(cb);
-    player_->SetRankUpCallback([this](Robot& r) {
-        if (rank_up_choice_) rank_up_choice_(r);
-    });
-}
-
 }

@@ -35,28 +35,21 @@ namespace {
 Robot::Robot(const std::string& name, int health, int max_health,
                 int attack, int energy, int max_energy,
                 int experience, int experience_to_rank_up, int speed,
-                int visibility_radius)
-    : name_(name),
-        health_(0),
-        max_health_(kMinHealth),
-        attack_(0),
-        energy_(0),
-        max_energy_(kMinEnergy),
-        experience_(0),
-        experience_to_rank_up_(kMinExperienceToRankUp),
-        rank_(1),
-        speed_(kMinSpeed),
-        visibility_radius_(kMinVisibilityRadius),
-        x_(0), y_(0) {
-    SetMaxHealth(max_health);
-    SetMaxEnergy(max_energy);
-    SetExperienceToRankUp(experience_to_rank_up);
-    SetSpeed(speed);
-    SetVisibilityRadius(visibility_radius);
+                int visibility_radius) {
+    name_ = name;
+    max_health_ = std::max(max_health, kMinHealth);
+    health_ = std::clamp(health, 0, max_health_);
+    attack_ = std::max(attack, kMinAttack);
+    max_energy_ = std::max(max_energy, kMinEnergy);
+    energy_ = std::clamp(energy, 0, max_energy_);
+    experience_ = std::max(experience, kMinExperience);
+    experience_to_rank_up_ = std::max(experience_to_rank_up, kMinExperienceToRankUp);
+    rank_ = 1;
+    speed_ = std::max(speed, kMinSpeed);
+    visibility_radius_ = std::max(visibility_radius, kMinVisibilityRadius);
+    x_ = 0;
+    y_= 0;
 
-    SetHealth(health);
-    SetAttack(attack);
-    SetEnergy(energy);
     SetExperience(experience);
 }
 
@@ -88,9 +81,7 @@ void Robot::SetHealth(int health) {
 
 void Robot::SetMaxHealth(int max_health) {
     max_health_ = std::max(max_health, kMinHealth);
-    if (health_ > max_health_) {
-        health_ = max_health_;
-    }
+    health_ = std::clamp(health_, 0, max_health_);
 }
 
 void Robot::SetAttack(int attack) {
@@ -103,17 +94,11 @@ void Robot::SetEnergy(int energy) {
 
 void Robot::SetMaxEnergy(int max_energy) {
     max_energy_ = std::max(max_energy, kMinEnergy);
-    if (energy_ > max_energy_) {
-        energy_ = max_energy_;
-    }
+    energy_ = std::clamp(energy_, 0, max_energy_);
 }
 
 void Robot::SetExperience(int experience) {
     experience_ = std::max(experience, kMinExperience);
-}
-
-void Robot::SetExperienceToRankUp(int experience_to_rank_up) {
-    experience_to_rank_up_ = std::max(experience_to_rank_up, kMinExperienceToRankUp);
 }
 
 void Robot::SetSpeed(int speed) {
@@ -159,14 +144,12 @@ void Robot::AddExperience(int amount) {
 void Robot::TryRankUp() {
     while (experience_ >= experience_to_rank_up_ && rank_ < kMaxRank) {
         experience_ -= experience_to_rank_up_;
-        ++rank_;
+        rank_++;
         SetMaxHealth(max_health_ + kHealthBonusPerRank);
         SetHealth(max_health_);
         SetAttack(attack_ + kAttackBonusPerRank);
         SetMaxEnergy(max_energy_ + kEnergyBonusPerRank);
         SetEnergy(max_energy_);
-
-        if (rank_up_callback_) rank_up_callback_(*this);
     }
 }
 
@@ -261,10 +244,6 @@ const std::vector<std::unique_ptr<ISpecialAbility>>& Robot::GetAbilities() const
 
 const std::vector<std::unique_ptr<IStatus>>& Robot::GetStatuses() const {
     return statuses_;
-}
-
-void Robot::SetRankUpCallback(std::function<void(Robot&)> cb) {
-    rank_up_callback_ = std::move(cb);
 }
 
 }

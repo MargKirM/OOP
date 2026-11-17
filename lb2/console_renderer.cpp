@@ -24,9 +24,7 @@ char ConsoleRenderer::GetCellSymbol(int x, int y) const {
     }
 
     if(!game_.IsVisible(x, y)) {
-        for (const auto& factory : game_.GetFactories()) {
-            if (factory->Occupies(x, y)) return '@';   // factory is visible
-        }
+        if (game_.GetFactory().Occupies(x, y)) return '@';   // factory is visible
         if (!game_.GetField().IsPassable(x, y)) { // not passable cell
             return '#';
         }
@@ -45,9 +43,7 @@ char ConsoleRenderer::GetCellSymbol(int x, int y) const {
             }
     }
 
-    for(const auto& factory : game_.GetFactories()) {
-        if (factory->Occupies(x, y)) return '@';
-    }
+    if (game_.GetFactory().Occupies(x, y)) return '@';
 
     if (!game_.GetField().IsPassable(x, y)) { // not passable cell
         return '#';

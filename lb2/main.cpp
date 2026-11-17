@@ -7,37 +7,33 @@
 using namespace lab2;
 
 int main() {
-    using namespace lab2;
     Game game(15, 15);
     ConsoleRenderer renderer(game);
-    game.ConfigureDemo(renderer.ChooseAbility(game.GetPlayer(), false));
-    game.SetRankUpChoice([&renderer](Robot& robot) {
-        AbilityKind kind = renderer.ChooseAbility(robot, true);
-        if (robot.HasAbility(kind)) robot.UpgradeAbility(kind);
-        else robot.AddAbility(kind);
-    });
-    
-    
-    while (game.GetPlayer().IsAlive() && !game.IsLevelComplete()) {
+    auto& player = game.GetPlayer();
+    game.ConfigureDemo(renderer.ChooseAbility(player, false));
+
+    for(int lastRank = player.GetRank(); player.IsAlive() && !game.IsLevelComplete();)
+    {
         renderer.Render();
 
         std::cout << "\nСпособности (нажмите цифру):\n";
-    const auto& abilities = game.GetPlayer().GetAbilities();
-    if (abilities.empty()) {
-        std::cout << "  (нет способностей)\n";
-    } else {
-        for (const auto& a : abilities) {
-            const char* key = "?";
-            for (int i = 0; i < 4; ++i) {
-                if (a->GetName() == AbilityName(static_cast<AbilityKind>(i))) {
-                    key = (i == 0) ? "1" : (i == 1) ? "2" : (i == 2) ? "3" : "4";
-                    break;
+        const auto& abilities = game.GetPlayer().GetAbilities();
+
+        if (abilities.empty()) {
+            std::cout << "  (нет способностей)\n";
+        } else {
+            for (const auto& a : abilities) {
+                const char* key = "?";
+                for (int i = 0; i < 4; ++i) {
+                    if (a->GetName() == AbilityName(static_cast<AbilityKind>(i))) {
+                        key = (i == 0) ? "1" : (i == 1) ? "2" : (i == 2) ? "3" : "4";
+                        break;
+                    }
                 }
+                std::cout << "  [" << key << "] " << a->GetName()
+                        << " (энергия: " << a->GetEnergyCost() << ")\n";
             }
-            std::cout << "  [" << key << "] " << a->GetName()
-                      << " (энергия: " << a->GetEnergyCost() << ")\n";
         }
-    }
 
         std::cout << "\nw/a/s/d - движение, 1..4 - способность, "
                  "i - инвентарь, v - режим отображения, e - закончить ход, q - выход\n";
@@ -102,6 +98,25 @@ int main() {
             case 'a': game.Step(Direction::kLeft); break;
             case 'd': game.Step(Direction::kRight); break;
             default: std::cout << "Неизвестная команда.\n"; break;
+        }
+
+        while (lastRank < player.GetRank()) {
+            bool hasUpgradable = player.GetAbilities().size() < 4;
+            if (!hasUpgradable) {
+                for (const auto& ability : player.GetAbilities()) {
+                    if (ability->IsUpgradable()) {
+                        hasUpgradable = true;
+                        break;
+                    }
+                }
+            }
+
+            if (hasUpgradable) {
+                AbilityKind kind = renderer.ChooseAbility(player, true);
+                if (player.HasAbility(kind)) player.UpgradeAbility(kind);
+                else player.AddAbility(kind);
+            }
+            lastRank++;
         }
     }
     renderer.Render();
