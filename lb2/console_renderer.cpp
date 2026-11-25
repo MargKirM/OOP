@@ -2,16 +2,14 @@
 
 #include <utility>
 #include <iostream>
-#include <limits>
 
 namespace lab2 {
 
-namespace {
-    const char* kReset  = "\033[0m";
-    const char* kRed    = "\033[31m";
-    const char* kBlue   = "\033[1;94m";
-    const char* kStatusCell = "\033[30;102m";
-}
+const char* kReset  = "\033[0m";
+const char* kRed    = "\033[31m";
+const char* kBlue   = "\033[1;94m";
+const char* kStatusCell = "\033[30;102m";
+
 
 ConsoleRenderer::ConsoleRenderer(const Game& game) : game_(game) {}
 
@@ -69,7 +67,7 @@ bool ConsoleRenderer::ShouldHighlight(int x, int y) const {
         case RenderMode::kHighlightWalls:
             return game_.IsExplored(x, y) && !game_.GetField().IsPassable(x, y);
         case RenderMode::kHighlightStatusCells:
-            return game_.IsExplored(x, y) && game_.GetCellStatusCount(x, y) > 0;
+            return game_.IsExplored(x, y) && game_.GetField().GetCellStatusCount(x, y) > 0;
     }
     return false;
 }
@@ -85,7 +83,7 @@ void ConsoleRenderer::Render() const {
             if (ShouldHighlight(x, y)) { //Highlighting
                 const char* color = kRed;
                 if (mode_ == RenderMode::kHighlightWalls) color = kBlue;
-                if (mode_ == RenderMode::kHighlightStatusCells) {
+                if (mode_ == RenderMode::kHighlightStatusCells) { //Highlighting cells
                     color = kStatusCell;
                     std::cout << color << sym << ' ' << kReset;
                 } else {
@@ -102,9 +100,6 @@ void ConsoleRenderer::Render() const {
                  "@ — фабрика роботов, x — убитый враг, t — убитый игрок, "
                  "# — стена, ? — не исследована, "
                  "~ — болото (3), ^ — грязь (2)\n";
-    if (mode_ == RenderMode::kHighlightStatusCells) {
-        std::cout << "Светло-зелёный фон — клетка со статусом\n";
-    }
 
     const Robot& player = game_.GetPlayer();
 
@@ -166,29 +161,53 @@ void ConsoleRenderer::ToggleMode() { //переключение по кругу
 }
 
 AbilityKind ConsoleRenderer::ChooseAbility(const Robot& robot, bool rank_up) const{
-    while (true) {
-        std::cout << (rank_up ? "\nПовышение ранга: выберите способность:\n"
-                              : "\nВыберите начальную способность:\n");
-        for (int i = 0; i < 4; ++i) {
-            AbilityKind kind = static_cast<AbilityKind>(i);
+    bool selected = false;
+    AbilityKind selected_kind{};
+    while (!selected) {
+        if (rank_up)
+            std::cout << "\nПовышение ранга: выберите способность:\n";
+        else
+            std::cout << "\nВыберите начальную способность:\n";
+
+
+        for (int i = 0; i < 4; ++i) { // вывод всех abilities
+            AbilityKind kind = static_cast<AbilityKind>(i); // int => перечисление AbilityKind
             std::cout << i + 1 << " - " << AbilityName(kind);
-            if (rank_up) std::cout << (robot.HasAbility(kind) ? " (улучшить)" : " (получить)");
+            if (rank_up) {
+                if (robot.HasAbility(kind)) std::cout << " (улучшить)";
+                else std::cout << " (получить)";
+            }
             std::cout << '\n';
         }
+        
+        // choosing
         int choice;
-        if (std::cin >> choice && choice >= 1 && choice <= 4) {
-            AbilityKind kind = static_cast<AbilityKind>(choice - 1);
-            if (!rank_up || !robot.HasAbility(kind)) return kind;
-            for (const auto& ability : robot.GetAbilities()) {
-                if (ability->GetName() == AbilityName(kind) && ability->IsUpgradable()) return kind;
-            }
-            std::cout << "Эта способность уже улучшена до предела.\n";
-        } else {
+        if (!(std::cin >> choice) || choice < 1 || choice > 4) {
             std::cout << "Введите число от 1 до 4.\n";
+            std::cin.clear();
+            std::cin.ignore(1000, '\n');
+            continue;
         }
-        std::cin.clear();
-        std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+        selected_kind = static_cast<AbilityKind>(choice - 1);
+        selected = true;
+
+        if (rank_up) {
+            for (const auto& ability : robot.GetAbilities()) {
+                if (ability->GetName() == AbilityName(selected_kind)) {
+                    selected = ability->IsUpgradable();
+                    break;
+                }
+            }
+        }
+
+        if (!selected) {
+            std::cout << "Эта способность уже улучшена до предела.\n";
+            std::cin.clear();
+            std::cin.ignore(1000, '\n');
+        }
     }
+    return selected_kind;
 }
 
 }

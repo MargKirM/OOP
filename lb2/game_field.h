@@ -25,7 +25,7 @@ public:
     void SetPassCost(int x, int y, int cost);
 
     void AddStatusToCell(int x, int y, std::unique_ptr<IStatus> status);
-    void ApplyRandomCellStatusTo(Robot& robot, int x, int y);
+    Cell* GetCell(int x, int y);
 
     // for lighting cells with status
     std::size_t GetCellStatusCount(int x, int y) const;

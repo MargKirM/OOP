@@ -1,5 +1,4 @@
 #include <iostream>
-#include <limits>
 #include "console_renderer.h"
 #include "game.h"
 
@@ -25,7 +24,8 @@ int main() {
             for (const auto& a : abilities) {
                 const char* key = "?";
                 for (int i = 0; i < 4; ++i) {
-                    if (a->GetName() == AbilityName(static_cast<AbilityKind>(i))) {
+                    if (a->GetName() == AbilityName(static_cast<AbilityKind>(i))) { 
+                        // (static_cast) int => перечисление AbilityKind
                         key = (i == 0) ? "1" : (i == 1) ? "2" : (i == 2) ? "3" : "4";
                         break;
                     }
@@ -51,15 +51,15 @@ int main() {
             std::cout << "Использовать (0 — отмена): ";
             int idx;
             if (!(std::cin >> idx)) {
-                std::cin.clear();
-                std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+                std::cin.clear(); // очищение ввода (неправильных символов во входном потоке)
+                std::cin.ignore(1000, '\n'); // пропуск 1000 неправильных символов(или до конца строки)
                 continue;
             }
-            if (idx >= 1) game.UseItem(static_cast<std::size_t>(idx - 1));
+            if (idx >= 1) game.UseItem(idx - 1); // int => size_t
             continue;
         }
-        if (command >= '1' && command <= '4') {
-            AbilityKind kind = static_cast<AbilityKind>(command - '1');
+        if (command >= '1' && command <= '4') {        // вычитаем коды символов
+            AbilityKind kind = static_cast<AbilityKind>(command - '1'); // int => перечисление AbilityKind
             int x = 0, y = 0;
 
             if (kind == AbilityKind::kRangedStrike || kind == AbilityKind::kTeleport) {
@@ -72,8 +72,8 @@ int main() {
                 int steps;
                 if (!(std::cin >> steps) || steps < 1 || steps > max_steps) {
                     std::cout << "Неверное количество.\n";
-                    std::cin.clear();
-                    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+                    std::cin.clear(); // очищение ввода (неправильных символов во входном потоке)
+                    std::cin.ignore(1000, '\n'); // пропуск 1000 неправильных символов(или до конца строки)
                     continue;
                 }
 
@@ -89,7 +89,7 @@ int main() {
                 y = game.GetPlayer().GetY() + dy;
             }
 
-            if (!game.PlayerUseAbility(kind, x, y)) std::cout << "Способность не сработала.\n";
+            if (!player.TryUseAbility(game, kind, x, y)) std::cout << "Способность не сработала.\n";
             continue; // несколько способностей за ход
         }
         switch (command) {

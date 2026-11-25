@@ -61,14 +61,8 @@ public:
     bool IsVisible(int x, int y) const;
     bool IsExplored(int x, int y) const;
 
-    // for lighting
-    std::size_t GetCellStatusCount(int x, int y) const {
-        return field_.GetCellStatusCount(x, y);
-    }
-
     // for abilities
     std::vector<Robot*> GetRobots() const;
-    void DealDamage(Robot& target, int damage);
     bool TeleportRobot(Robot& robot, int x, int y);
 
     bool IsOccupiedExcept(int x, int y, const Robot* except) const;

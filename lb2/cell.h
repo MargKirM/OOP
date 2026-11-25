@@ -20,7 +20,6 @@ public:
     void SetPassCost(int pass_cost);
 
     void AddStatus(std::unique_ptr<IStatus> status);
-    void RemoveRandomStatus();
     void ApplyRandomStatusTo(Robot& robot);
 
 

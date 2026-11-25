@@ -4,10 +4,8 @@
 
 namespace lab2 {
 
-namespace {
-    constexpr int kMinSize = 5; // constexpr to define true constants(compile-time values)
-    constexpr int kMaxSize = 50;
-}
+constexpr int kMinSize = 5; // constexpr to define true constants(compile-time values)
+constexpr int kMaxSize = 50;
 
 GameField::GameField(int width, int height) : width_(width), height_(height) {  // constructor
     if (width < kMinSize) width_ = kMinSize;
@@ -51,15 +49,15 @@ void GameField::SetPassCost(int x, int y, int cost) {
     }
 }
 
-void GameField::AddStatusToCell(int x, int y, std::unique_ptr<IStatus> status) {
+void GameField::AddStatusToCell(int x, int y, std::unique_ptr<IStatus> status) { // IsInside !
     if (IsInside(x, y)) cells_[y][x].AddStatus(std::move(status));
 }
 
-void GameField::ApplyRandomCellStatusTo(Robot& robot, int x, int y) {
-    if (IsInside(x, y)) cells_[y][x].ApplyRandomStatusTo(robot);
+Cell* GameField::GetCell(int x, int y) {
+    return IsInside(x, y) ? &cells_[y][x] : nullptr;
 }
 
-std::size_t GameField::GetCellStatusCount(int x, int y) const {
+std::size_t GameField::GetCellStatusCount(int x, int y) const { // IsInside !
     return IsInside(x, y) ? cells_[y][x].GetStatusCount() : 0;
 }
 

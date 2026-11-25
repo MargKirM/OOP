@@ -7,7 +7,6 @@
 
 #include "ability.h"
 #include "status.h"
-
 namespace lab2 {
 
 class Game;

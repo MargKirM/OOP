@@ -7,9 +7,7 @@
 
 namespace lab2 {
 
-namespace {
-    constexpr std::size_t kMaxCellStatuses = 2;   // от 0 до 2 statuses
-}
+constexpr std::size_t kMaxCellStatuses = 2;   // от 0 до 2 statuses
 
 Cell::Cell() : is_passable_(true), pass_cost_(1) {} // constructor
 
@@ -30,22 +28,15 @@ void Cell::SetPassCost(int cost) {
 void Cell::AddStatus(std::unique_ptr<IStatus> status) {
     if (!status) return;
     if (statuses_.size() >= kMaxCellStatuses) return;
-    statuses_.push_back(std::move(status));
+    statuses_.push_back(std::move(status)); // can't copy unique_ptr => std::move (передать владение of status to vector)
 }
 
-void Cell::RemoveRandomStatus() {
-    if (statuses_.empty()) return;
-    const std::size_t idx =
-        static_cast<std::size_t>(std::rand()) % statuses_.size();
-    statuses_.erase(statuses_.begin() + idx);
-}
 
 void Cell::ApplyRandomStatusTo(Robot& robot) {
     if (statuses_.empty()) return;
-    const std::size_t idx =
-        static_cast<std::size_t>(std::rand()) % statuses_.size();
-    robot.AddStatus(statuses_[idx]->Clone());
-    statuses_.erase(statuses_.begin() + idx);
+    const std::size_t idx = std::rand() % statuses_.size();
+    robot.AddStatus(statuses_[idx]->Clone()); // can't copy unique_ptr => Clone status from cell
+    statuses_.erase(statuses_.begin() + idx); // robot saved copy of status
 }
 
 std::size_t Cell::GetStatusCount() const {

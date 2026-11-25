@@ -1,27 +1,26 @@
 #include "game.h"
 
 #include <cstdlib>
+#include <utility>
 
 namespace lab2 {
 
-namespace {
-    constexpr int kEnergyRegen = 10;
-    constexpr int kMoveEnergyCost = 1;
-    constexpr int kAttackEnergyCost = 2;
+constexpr int kEnergyRegen = 10;
+constexpr int kMoveEnergyCost = 1;
+constexpr int kAttackEnergyCost = 2;
 
-    // Вероятности: чем больше статусов, тем меньше вероятность
-    constexpr int kChanceTwoStatuses = 10;   // 10% — two
-    constexpr int kChanceOneStatus   = 15;   // 15% — one (at all 25%)
-    constexpr int kBurningCellTurns  = 3;
-    constexpr int kBurningCellDamage = 4;
-    constexpr int kShieldCellAmount  = 15;
+// чем больше статусов, тем меньше вероятность
+constexpr int kChanceTwoStatuses = 10;   // 10% — two
+constexpr int kChanceOneStatus   = 15;   // 15% — one (at all 25%)
+constexpr int kBurningCellTurns  = 3;
+constexpr int kBurningCellDamage = 4;
+constexpr int kShieldCellAmount  = 15;
 
-    // inventory
-    constexpr int kHealthPotionHeal = 30;
-    constexpr int kEnergyPotionRegen = 20;
-    constexpr int kAttackBoostBonus = 5;
-    constexpr int kAttackBoostTurns = 3;
-}
+// inventory
+constexpr int kItemHeal = 30;
+constexpr int kItemEnergyRegen = 20;
+constexpr int kItemAttackBonus = 5;
+constexpr int kAttackBoostTurns = 3;
 
 Game::Game(int width, int height) : field_(width, height),
         player_(std::make_unique<Robot>("Player", 100, 100, 10,
@@ -31,8 +30,7 @@ Game::Game(int width, int height) : field_(width, height),
 {
     player_->SetPosition(0, 0); 
 
-    explored_cells_.assign(field_.GetHeight(),
-                            std::vector<bool>(field_.GetWidth(), false));
+    explored_cells_.assign(field_.GetHeight(), std::vector<bool>(field_.GetWidth(), false));
     UpdateVisibility();
 }
 
@@ -73,7 +71,7 @@ void Game::ConfigureDemo(AbilityKind start_ability) {
 }
 
 void Game::GenerateEnemies(int count) {
-    enemies_.clear();
+    enemies_.clear(); // для перезапуска уровня
 
     int placed = 0;
     for (int y = 0; y < field_.GetHeight() && placed < count; ++y) {
@@ -83,8 +81,7 @@ void Game::GenerateEnemies(int count) {
             if (IsOccupiedExcept(x, y, nullptr)) continue;
 
             auto enemy = std::make_unique<Robot>(
-                "Enemy" + std::to_string(placed), 40, 40, 5,
-                30, 30, 0, 100, 3, 1);
+                "Enemy" + std::to_string(placed), 40, 40, 5, 30, 30, 0, 100, 3, 1);
             enemy->SetPosition(x, y);
             // Heal or Teleport for enemy
             enemy->AddAbility((std::rand() % 2) ? AbilityKind::kHeal : AbilityKind::kTeleport);
@@ -95,7 +92,7 @@ void Game::GenerateEnemies(int count) {
 }
 
 void Game::GenerateFriends(int count) {
-    friends_.clear();
+    friends_.clear(); // для перезапуска уровня
 
     int placed = 0;
     for (int y = 0; y < field_.GetHeight() && placed < count; ++y) {
@@ -212,7 +209,7 @@ bool Game::TryMoveRobot(Robot& robot, int x, int y) {
 
     robot.SetEnergy(robot.GetEnergy() - kMoveEnergyCost);
     robot.SetPosition(x, y);
-    field_.ApplyRandomCellStatusTo(robot, x, y);
+    field_.GetCell(x, y)->ApplyRandomStatusTo(robot);
     return true;
 }
 
@@ -367,7 +364,7 @@ void Game::EndPlayerTurn() {
     UpdateVisibility();
 }
 
-void Game::Step(Direction direction) {
+void Game::Step(Direction direction) { //can we continue game  ???
     if (!player_->IsAlive() || IsLevelComplete()) return;
     StepPlayer(direction);
     EndPlayerTurn();
@@ -409,8 +406,7 @@ void Game::GenerateEnemyFromFactory() {
     }
 }
 
-// for abilities
-std::vector<Robot*> Game::GetRobots() const {
+std::vector<Robot*> Game::GetRobots() const { // for abilities
     std::vector<Robot*> robots;
     if (player_->IsAlive()) robots.push_back(player_.get());
     for (const auto& e : enemies_) if (e->IsAlive()) robots.push_back(e.get());
@@ -418,25 +414,15 @@ std::vector<Robot*> Game::GetRobots() const {
     return robots;
 }
 
-void Game::DealDamage(Robot& target, int damage) {
-    target.ApplyDamage(damage);   // from statuses (shield)
-}
-
 bool Game::TeleportRobot(Robot& robot, int x, int y) {
     if (!field_.IsPassable(x, y)) return false;
     if (IsOccupiedExcept(x, y, &robot)) return false;
     robot.SetPosition(x, y);
-    field_.ApplyRandomCellStatusTo(robot, x, y);
+    field_.GetCell(x, y)->ApplyRandomStatusTo(robot);
     return true;
 }
 
-// for player
-bool Game::PlayerUseAbility(AbilityKind kind, int tx, int ty) {
-    return player_->TryUseAbility(*this, kind, tx, ty);
-}
-
-// inventory
-void Game::AddItem(ItemKind kind) {
+void Game::AddItem(ItemKind kind) { // добавить предмет (inventory)
     inventory_.push_back(Item(kind));
 }
 
@@ -445,24 +431,24 @@ bool Game::UseItem(std::size_t index) {
     ItemKind kind = inventory_[index].GetKind();
     switch (kind) {
         case ItemKind::kHealthPotion:
-            player_->Heal(kHealthPotionHeal);
+            player_->Heal(kItemHeal);
             break;
         case ItemKind::kEnergyPotion:
-            player_->RegenerateEnergy(kEnergyPotionRegen);
+            player_->RegenerateEnergy(kItemEnergyRegen);
             break;
         case ItemKind::kAttackBoost:
-            player_->AddStatus(CreateAttackBoostStatus(kAttackBoostBonus, kAttackBoostTurns));
+            player_->AddStatus(CreateAttackBoostStatus(kItemAttackBonus, kAttackBoostTurns));
             break;
     }
     inventory_.erase(inventory_.begin() + index);
     return true;
 }
 
-ItemKind Game::RandomItemKind() {
+ItemKind Game::RandomItemKind() {  // предметы = inventory = инвентарь
     switch (std::rand() % 3) {
         case 0: return ItemKind::kHealthPotion;
         case 1: return ItemKind::kEnergyPotion;
-        default: return ItemKind::kAttackBoost;
+        default: return ItemKind::kAttackBoost;     // ~33% — предмет
     }
 }
 
@@ -491,7 +477,7 @@ std::unique_ptr<IStatus> Game::RandomStatus() {
         case 1: return CreateOverloadStatus();
         case 2: return CreateBurningStatus(kBurningCellTurns, kBurningCellDamage);
         case 3: return CreateShieldStatus(kShieldCellAmount);
-        default: return CreateItemPickupStatus();   // 20% — предмет
+        default: return CreateItemPickupStatus();   // 20% — предмет (всего 5 шт. => 5*20=100)
     }
 }
 }
